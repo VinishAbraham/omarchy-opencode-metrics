@@ -7,7 +7,7 @@ import "Model.js" as Model
 
 BarWidget {
   id: root
-  moduleName: "eagleshieldpro.opencode-metrics"
+  moduleName: "vinishabraham.opencode-metrics"
 
   readonly property bool opened: panelLoader.item
     ? panelLoader.item.opened === true

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "eagleshieldpro.opencode-metrics",
+  "id": "vinishabraham.opencode-metrics",
   "name": "OpenCode Metrics",
   "version": "1.0.0",
-  "author": "EagleShieldPro",
+  "author": "VinishAbraham",
   "license": "MIT",
   "description": "Live OpenCode cost and token usage for today, straight in the bar. Reads the local opencode sqlite store — no network, no API keys.",
   "kinds": ["bar-widget"],

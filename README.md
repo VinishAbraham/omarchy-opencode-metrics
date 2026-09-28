@@ -6,7 +6,7 @@ Reads your local OpenCode sqlite store — no network, no API keys, no daemon.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/omarchy-opencode-metrics.git --enable
+omarchy plugin add https://github.com/VinishAbraham/omarchy-opencode-metrics.git --enable
 ```
 
 The widget defaults to the right bar section. Omarchy stores its settings and
@@ -40,9 +40,9 @@ credentials, or files outside Omarchy's normal plugin settings.
 Use Omarchy's bar settings UI, or set values directly:
 
 ```bash
-omarchy bar set eagleshieldpro.opencode-metrics refreshIntervalSec 3
-omarchy bar set eagleshieldpro.opencode-metrics showCost true --json
-omarchy bar set eagleshieldpro.opencode-metrics showTokens true --json
+omarchy bar set vinishabraham.opencode-metrics refreshIntervalSec 3
+omarchy bar set vinishabraham.opencode-metrics showCost true --json
+omarchy bar set vinishabraham.opencode-metrics showTokens true --json
 ```
 
 | Setting | Default | Range | Purpose |
@@ -54,7 +54,7 @@ omarchy bar set eagleshieldpro.opencode-metrics showTokens true --json
 ## Remove
 
 ```bash
-omarchy plugin remove eagleshieldpro.opencode-metrics
+omarchy plugin remove vinishabraham.opencode-metrics
 ```
 
 Omarchy removes the bar entry before uninstalling the plugin. No separate

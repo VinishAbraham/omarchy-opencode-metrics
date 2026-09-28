@@ -7,7 +7,7 @@ import "Model.js" as Model
 
 Panel {
   id: root
-  moduleName: "eagleshieldpro.opencode-metrics"
+  moduleName: "vinishabraham.opencode-metrics"
   manageIpc: false
 
   property var anchorItem: null
