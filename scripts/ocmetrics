@@ -2,7 +2,8 @@
 # Emit one JSON line of today's OpenCode usage from the local sqlite store.
 #   ocmetrics                      one shot
 #   ocmetrics --loop --interval 3  stream one line every 3 seconds
-# Reads only; never writes. A missing/locked DB yields an empty-but-valid line
+# Reads only from the database; scratch files live in a private mktemp dir.
+# A missing/locked DB yields an empty-but-valid line
 # so the bar never blanks on a failed read.
 set -u
 
@@ -18,6 +19,18 @@ done
 
 db="${OPENCODE_DB:-$HOME/.local/share/opencode/opencode.db}"
 
+# Private scratch space (mode 0700) created once at startup, so query output
+# never passes through predictable /tmp paths that could be pre-created as
+# symlinks. Removed automatically on exit; signal traps exit explicitly
+# because a trap action alone would resume the polling loop.
+workdir="$(mktemp -d "${TMPDIR:-/tmp}/ocm.XXXXXX")" || {
+  printf '{"today_cost":null,"today_tokens":null,"today_sessions":0,"sessions":[],"history_days":[],"history_months":[]}\n'
+  exit 1
+}
+cleanup() { rm -rf "$workdir"; }
+trap cleanup EXIT
+trap 'cleanup; exit 143' INT TERM HUP
+
 one_reading() {
   local day_start now
   day_start=$(date -d '00:00' +%s 2>/dev/null) || day_start=0
@@ -32,16 +45,16 @@ one_reading() {
   sqlite3 -readonly -separator '	' "$db" \
     "SELECT title, model, IFNULL(cost,0), IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0), time_updated
      FROM session WHERE time_updated >= $day_start AND time_archived IS NULL
-     ORDER BY time_updated DESC LIMIT 10;" 2>/dev/null > /tmp/ocm-today.$$ \
+     ORDER BY time_updated DESC LIMIT 10;" 2>/dev/null > "$workdir/today" \
   && sqlite3 -readonly -separator '	' "$db" \
     "SELECT date(time_updated/1000,'unixepoch','localtime'), SUM(IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0)), SUM(IFNULL(cost,0)), COUNT(*)
      FROM session WHERE time_archived IS NULL
-     GROUP BY 1 ORDER BY 1 DESC LIMIT 30;" 2>/dev/null > /tmp/ocm-days.$$ \
+     GROUP BY 1 ORDER BY 1 DESC LIMIT 30;" 2>/dev/null > "$workdir/days" \
   && sqlite3 -readonly -separator '	' "$db" \
     "SELECT strftime('%Y-%m',time_updated/1000,'unixepoch','localtime'), SUM(IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0)), SUM(IFNULL(cost,0)), COUNT(*)
      FROM session WHERE time_archived IS NULL
-     GROUP BY 1 ORDER BY 1 DESC LIMIT 12;" 2>/dev/null > /tmp/ocm-months.$$ \
-  && python3 - /tmp/ocm-today.$$ /tmp/ocm-days.$$ /tmp/ocm-months.$$ 2>/dev/null <<'PYEOF'
+     GROUP BY 1 ORDER BY 1 DESC LIMIT 12;" 2>/dev/null > "$workdir/months" \
+  && python3 - "$workdir/today" "$workdir/days" "$workdir/months" 2>/dev/null <<'PYEOF'
 import json, sys
 def read_rows(path, n):
     rows = []
@@ -106,7 +119,7 @@ print(json.dumps({"today_cost": round(cost, 4), "today_tokens": toks,
                   "history_days": agg(days), "history_months": agg(months)}))
 PYEOF
   rc=$?
-  rm -f /tmp/ocm-today.$$ /tmp/ocm-days.$$ /tmp/ocm-months.$$
+  # Scratch files stay inside the private $workdir, removed by the EXIT trap.
   [ $rc -eq 0 ] || printf '{"today_cost":null,"today_tokens":null,"today_sessions":0,"sessions":[],"history_days":[],"history_months":[]}\n'
 }
 
