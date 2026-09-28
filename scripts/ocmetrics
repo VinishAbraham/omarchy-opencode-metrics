@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Emit one JSON line of today's OpenCode usage from the local sqlite store.
+#   ocmetrics                      one shot
+#   ocmetrics --loop --interval 3  stream one line every 3 seconds
+# Reads only; never writes. A missing/locked DB yields an empty-but-valid line
+# so the bar never blanks on a failed read.
+set -u
+
+interval=3
+loop=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --loop) loop=1 ;;
+    --interval) interval="${2:-3}"; shift ;;
+  esac
+  shift
+done
+
+db="${OPENCODE_DB:-$HOME/.local/share/opencode/opencode.db}"
+
+one_reading() {
+  local day_start now
+  day_start=$(date -d '00:00' +%s 2>/dev/null) || day_start=0
+  day_start=$((day_start * 1000))
+  now=$(date +%s%3N 2>/dev/null) || now=$(( $(date +%s) * 1000 ))
+
+  if [ ! -r "$db" ]; then
+    printf '{"today_cost":null,"today_tokens":null,"today_sessions":0,"sessions":[]}\n'
+    return
+  fi
+
+  sqlite3 -readonly -separator '	' "$db" \
+    "SELECT title, model, IFNULL(cost,0), IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0), time_updated
+     FROM session WHERE time_updated >= $day_start AND time_archived IS NULL
+     ORDER BY time_updated DESC LIMIT 10;" 2>/dev/null > /tmp/ocm-today.$$ \
+  && sqlite3 -readonly -separator '	' "$db" \
+    "SELECT date(time_updated/1000,'unixepoch','localtime'), SUM(IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0)), SUM(IFNULL(cost,0)), COUNT(*)
+     FROM session WHERE time_archived IS NULL
+     GROUP BY 1 ORDER BY 1 DESC LIMIT 30;" 2>/dev/null > /tmp/ocm-days.$$ \
+  && sqlite3 -readonly -separator '	' "$db" \
+    "SELECT strftime('%Y-%m',time_updated/1000,'unixepoch','localtime'), SUM(IFNULL(tokens_input,0)+IFNULL(tokens_output,0)+IFNULL(tokens_reasoning,0)), SUM(IFNULL(cost,0)), COUNT(*)
+     FROM session WHERE time_archived IS NULL
+     GROUP BY 1 ORDER BY 1 DESC LIMIT 12;" 2>/dev/null > /tmp/ocm-months.$$ \
+  && python3 - /tmp/ocm-today.$$ /tmp/ocm-days.$$ /tmp/ocm-months.$$ 2>/dev/null <<'PYEOF'
+import json, sys
+def read_rows(path, n):
+    rows = []
+    try:
+        with open(path) as f:
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) == n:
+                    rows.append(parts)
+    except Exception:
+        pass
+    return rows
+today = read_rows(sys.argv[1], 5)
+days = read_rows(sys.argv[2], 4)
+months = read_rows(sys.argv[3], 4)
+sessions = []
+cost = 0.0
+toks = 0
+for parts in today:
+    title, model, c, t, upd = parts
+    try:
+        model = json.loads(model).get("id", "") if model else ""
+    except Exception:
+        model = ""
+    try:
+        c = float(c)
+    except Exception:
+        c = 0.0
+    try:
+        t = int(float(t))
+    except Exception:
+        t = 0
+    try:
+        upd = int(float(upd) // 1000)
+    except Exception:
+        upd = 0
+    title = " ".join(title.split())[:64]
+    model = model.split("/")[-1][:32]
+    sessions.append({"title": title, "model": model, "cost": round(c, 4), "tokens": t, "updated": upd})
+    cost += c
+    toks += t
+def agg(rows):
+    out = []
+    for parts in rows:
+        period, t, c, n = parts
+        try:
+            t = int(float(t))
+        except Exception:
+            t = 0
+        try:
+            c = float(c)
+        except Exception:
+            c = 0.0
+        try:
+            n = int(float(n))
+        except Exception:
+            n = 0
+        out.append({"period": period, "tokens": t, "cost": round(c, 4), "sessions": n})
+    return out
+print(json.dumps({"today_cost": round(cost, 4), "today_tokens": toks,
+                  "today_sessions": len(sessions), "sessions": sessions,
+                  "history_days": agg(days), "history_months": agg(months)}))
+PYEOF
+  rc=$?
+  rm -f /tmp/ocm-today.$$ /tmp/ocm-days.$$ /tmp/ocm-months.$$
+  [ $rc -eq 0 ] || printf '{"today_cost":null,"today_tokens":null,"today_sessions":0,"sessions":[],"history_days":[],"history_months":[]}\n'
+}
+
+if [ "$loop" -eq 1 ]; then
+  while true; do
+    one_reading
+    sleep "$interval"
+  done
+else
+  one_reading
+fi

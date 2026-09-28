@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "eagleshieldpro.opencode-metrics",
+  "name": "OpenCode Metrics",
+  "version": "1.0.0",
+  "author": "EagleShieldPro",
+  "license": "MIT",
+  "description": "Live OpenCode cost and token usage for today, straight in the bar. Reads the local opencode sqlite store — no network, no API keys.",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "barWidget": {
+    "displayName": "OpenCode Metrics",
+    "description": "Today's OpenCode spend and tokens in the bar; per-session breakdown in the panel.",
+    "category": "AI",
+    "aliases": ["opencode-metrics", "opencode-usage", "oc-usage"],
+    "defaults": {
+      "refreshIntervalSec": 3,
+      "showCost": true,
+      "showTokens": true
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "description": "How often the bar reading updates from the local store.",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 3
+      },
+      {
+        "key": "showCost",
+        "type": "boolean",
+        "label": "Show cost",
+        "defaultValue": true,
+        "description": "Show today's spend in the bar read-out."
+      },
+      {
+        "key": "showTokens",
+        "type": "boolean",
+        "label": "Show tokens",
+        "defaultValue": true,
+        "description": "Show today's token count in the bar read-out."
+      }
+    ]
+  }
+}
