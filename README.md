@@ -3,6 +3,33 @@
 Live OpenCode cost and token usage for today, straight in the Omarchy 4 bar.
 Reads your local OpenCode sqlite store — no network, no API keys, no daemon.
 
+![OpenCode Metrics bar widget and details panel](preview.png)
+
+## At a glance
+
+The bar shows today's spend and tokens, e.g. `OC $0 · 1.9M`:
+
+![Bar read-out in the Omarchy bar](assets/bar.png)
+
+Left-click opens the details panel — today's sessions, a last-14-days bar
+chart, and totals by month:
+
+![Details panel with sessions and history](assets/panel.png)
+
+## Features
+
+- **Today in the bar** — spend (`$0.42`), tokens (`497k`), or both; short
+  `OC n/a` state instead of a blank widget when there is nothing to read.
+- **Session breakdown** — up to 10 of today's sessions with title, model,
+  tokens, cost, and last-active time; also in the hover tooltip.
+- **History** — last-14-days token bars scaled to the busiest day, plus
+  per-month totals.
+- **Fast when open, calm when closed** — polls every 3 seconds normally,
+  every 1 second while the panel is open.
+- **Private by design** — read-only queries against your own machine;
+  malformed data is sanitized before display and one bad read never blanks
+  the bar.
+
 ## Install
 
 ```bash
